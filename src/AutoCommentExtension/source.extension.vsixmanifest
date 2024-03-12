@@ -4,6 +4,7 @@
         <Identity Id="AutoCommentExtension.5f2c262b-c249-4bc3-8de9-537f420c33ec" Version="1.0" Language="en-US" Publisher="Miklos BARTFAI" />
         <DisplayName>AutoCommentExtension</DisplayName>
         <Description xml:space="preserve">AutoCommentExtension</Description>
+        <License>LICENSE.txt</License>
         <Icon>Resources\Icon.png</Icon>
         <PreviewImage>Resources\Icon.png</PreviewImage>
     </Metadata>
