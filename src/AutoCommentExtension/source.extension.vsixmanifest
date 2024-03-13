@@ -1,12 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
     <Metadata>
-        <Identity Id="AutoCommentExtension.5f2c262b-c249-4bc3-8de9-537f420c33ec" Version="1.0" Language="en-US" Publisher="Miklos BARTFAI" />
-        <DisplayName>AutoCommentExtension</DisplayName>
-        <Description xml:space="preserve">AutoCommentExtension</Description>
+        <Identity Id="AutoCommentExtension.5f2c262b-c249-4bc3-8de9-537f420c33ec" Version="1.0" Language="en-US" Publisher="Miklos Bartfai" />
+        <DisplayName>AutoComment for C# files</DisplayName>
+        <Description xml:space="preserve">AutoComment creats XML comment for public members in C# files.
+
+Features:
+ - customizable templates
+ - can run on save
+</Description>
+        <MoreInfo>https://github.com/miklosBartfai/AutoComment-for-CSharp</MoreInfo>
         <License>LICENSE.txt</License>
-        <Icon>Resources\Icon.png</Icon>
-        <PreviewImage>Resources\Icon.png</PreviewImage>
+        <Icon>Resources\xml.png</Icon>
+        <PreviewImage>Resources\xml.png</PreviewImage>
+        <Tags>c# xml comment</Tags>
     </Metadata>
     <Installation>
         <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0, 18.0)">
