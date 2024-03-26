@@ -41,8 +41,8 @@ namespace AutoCommentExtension
         [Category("Templates")]
         [DisplayName("Constructors")]
         [Description("The template to use for the constructors. Possible values:\r\n - {name} : the name of the class/struct\r\n - {parameters} : see the 'Parameters' template\r\n - {nl} for new line.")]
-        [DefaultValue(@"/// Initializes a new instance of the <see cref=""{name}""/> class.{parameters}")]
-        public string ConstructorTemplate { get; set; } = @"/// Initializes a new instance of the <see cref=""{name}""/> class.{parameters}";
+        [DefaultValue(@"/// <summary>{nl}/// Initializes a new instance of the <see cref=""{name}""/> class.{nl}/// </summary>{parameters}")]
+        public string ConstructorTemplate { get; set; } = @"/// <summary>{nl}/// Initializes a new instance of the <see cref=""{name}""/> class.{nl}/// </summary>{parameters}";
 
         [Category("Templates")]
         [DisplayName("Methods")]

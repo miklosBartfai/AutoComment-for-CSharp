@@ -63,35 +63,54 @@ namespace AutoCommentExtension
 
             var lines = doc.TextBuffer.CurrentSnapshot.Lines;
 
-            using (var edit = doc.TextBuffer.CreateEdit())
+            using var edit = doc.TextBuffer.CreateEdit();
+
+            var lineIndex = 1;
+            var lineCount = lines.Count();
+            var prevLineWasAttribute = false;
+            var firstAttributeLine = lines.FirstOrDefault();
+
+            foreach (var line in lines)
             {
-                var lineIndex = 1;
-                var lineCount = lines.Count();
+                var text = line.GetText();
 
-                foreach (var line in lines)
+                if (XmlComment.IsXmlComment(text))
                 {
-                    var text = line.GetText();
-
-                    if (XmlComment.IsXmlComment(text))
+                    var extent = Span.FromBounds(line.Start, line.EndIncludingLineBreak);
+                    edit.Delete(extent);
+                }
+                else if (XmlComment.IsAttribute(text))
+                {
+                    if (!prevLineWasAttribute)
                     {
-                        var extent = Span.FromBounds(line.Start, line.EndIncludingLineBreak);
-                        edit.Delete(extent);
+                        firstAttributeLine = line;
                     }
-                    else
-                    {
-                        var comment = XmlComment.GetComment(text, options);
 
-                        if (comment != null)
+                    prevLineWasAttribute = true;
+                }
+                else
+                {
+                    var comment = XmlComment.GetComment(text, options);
+
+                    if (comment != null)
+                    {
+                        if (!prevLineWasAttribute)
                         {
                             edit.Insert(line.Start, comment);
                         }
+                        else
+                        {
+                            edit.Insert(firstAttributeLine.Start, comment);
+                        }
                     }
 
-                    await VS.StatusBar.ShowProgressAsync($"Step {lineIndex}/{lineCount}", lineIndex++, lineCount);
+                    prevLineWasAttribute = false;
                 }
 
-                edit.Apply();
+                await VS.StatusBar.ShowProgressAsync($"Step {lineIndex}/{lineCount}", lineIndex++, lineCount);
             }
+
+            edit.Apply();
         }
     }
 }

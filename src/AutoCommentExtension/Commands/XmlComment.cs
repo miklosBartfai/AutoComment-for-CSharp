@@ -5,7 +5,8 @@ namespace AutoCommentExtension
 {
     internal static class XmlComment
     {
-        const string _xmlCommentRegex = "[\\t\\f\\v ]*///";
+        const string _xmlCommentRegex = @"[\t\f\v ]*///";
+        const string _attributeRegex = @"\s+\[";
         const string _classRegex = @"([\t\f\v ]*)public\s+(class|interface|struct)\s+(\w+)\s*(:?\s*(\w+(,\s*\w+)*)?)?";
         const string _enumRegex = @"([\t\f\v ]*)public\s+enum\s+(\w+)";
         const string _constructorRegex = @"([\t\f\v ]*)public\s+(\w+)\s*\(([^)]*)\)\s*{?";
@@ -17,6 +18,14 @@ namespace AutoCommentExtension
         {
             var match = Regex.Match(text, _xmlCommentRegex);
             return match.Success;
+        }
+
+        internal static bool IsAttribute(string text)
+        {
+            var match = Regex.Match(text, _attributeRegex);
+            var firstCharIsAMatch = text.Length > 0 && text[0] == '[';
+
+            return match.Success || firstCharIsAMatch;
         }
 
         internal static string GetComment(string text, IXmlCommentOption option)

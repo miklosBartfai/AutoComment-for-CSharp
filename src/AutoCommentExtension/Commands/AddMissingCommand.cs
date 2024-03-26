@@ -28,10 +28,7 @@ namespace AutoCommentExtension
                         await CommentAsync();
                         var doc = await VS.Documents.GetActiveDocumentViewAsync();
 
-                        if (doc != null)
-                        {
-                            doc.Document.Save();
-                        }
+                        doc?.Document.Save();
                     }
                     catch (Exception ex)
                     {
@@ -66,42 +63,57 @@ namespace AutoCommentExtension
 
             var lines = doc.TextBuffer.CurrentSnapshot.Lines;
 
-            using (var edit = doc.TextBuffer.CreateEdit())
+            using var edit = doc.TextBuffer.CreateEdit();
+
+            var lineIndex = 1;
+            var lineCount = lines.Count();
+            var prevLineWasComment = false;
+            var prevLineWasAttribute = false;
+            var firstAttributeLine = lines.FirstOrDefault();
+
+            foreach (var line in lines)
             {
-                var lineIndex = 1;
-                var lineCount = lines.Count();
-                var prevLineWasComment = false;
+                var text = line.GetText();
 
-                foreach (var line in lines)
+                if (XmlComment.IsXmlComment(text))
                 {
-                    var text = line.GetText();
-
-                    if (XmlComment.IsXmlComment(text))
+                    prevLineWasComment = true;
+                }
+                else if (XmlComment.IsAttribute(text))
+                {
+                    if (!prevLineWasAttribute)
                     {
-                        prevLineWasComment = true;
+                        firstAttributeLine = line;
                     }
-                    else
-                    {
-                        if (!prevLineWasComment)
-                        {
-                            var comment = XmlComment.GetComment(text, options);
 
-                            if (comment != null)
+                    prevLineWasAttribute = true;
+                }
+                else
+                {
+                    if (!prevLineWasComment)
+                    {
+                        var comment = XmlComment.GetComment(text, options);
+
+                        if (comment != null)
+                        {
+                            if (!prevLineWasAttribute)
                             {
                                 edit.Insert(line.Start, comment);
                             }
-                        }
-                        else
-                        {
-                            prevLineWasComment = false;
+                            else
+                            {
+                                edit.Insert(firstAttributeLine.Start, comment);
+                            }
                         }
                     }
 
-                    await VS.StatusBar.ShowProgressAsync($"Step {lineIndex}/{lineCount}", lineIndex++, lineCount);
+                    prevLineWasComment = false;
+                    prevLineWasAttribute = false;
                 }
-
-                edit.Apply();
             }
+
+            await VS.StatusBar.ShowProgressAsync($"Step {lineIndex}/{lineCount}", lineIndex++, lineCount);
+            edit.Apply();
         }
     }
 }
