@@ -7,13 +7,22 @@ namespace AutoCommentExtension
     {
         const string _xmlCommentRegex = @"\s*///";
         const string _attributeRegex = @"\s+\[";
-        const string _classRegex = @"(\s*)public\s+(class|interface|struct|enum)\s+(\w+)";
-        const string _constructorRegex = @"(\s*)public\s+(\w+)\s*\(([^)]*)\)";
-        const string _partialConstructorRegex = @"(\s*)public\s+(\w+)\s*\(([^)]*)[^\)]";
-        const string _methodRegex = @"(\s*)public\s+(static\s*)?(async\s*)?(\w+(<\w+>)?)\s+(\w+)\s*\(([^)]*)\)";
-        const string _partialMethodRegex = @"(\s*)public\s+(static\s*)?(async\s*)?(\w+(<\w+>)?)\s+(\w+)\s*\(([^)]*)[^\)]";
-        const string _propertyRegex = @"(\s*)public\s+(\w+)\s+(\w+)\s*{\s*(get;)?\s*(set;)?(init;)?\s*}";
-        const string _parameterRegex = @"\s*([^)]*)(\))?";
+
+        const string indentRgx = @"(?<indent>\s*)";
+        const string accessRgx = @"(?<access>public|internal|protected|protected internal|private|private protected)";
+        const string startRgx = indentRgx + accessRgx;
+        const string typeRgx = @"(?<type>class|interface|struct|enum)";
+        const string nameRgx = @"(?<name>\w+)";
+        const string paramRgx = @"(?<param>[^)]*)";
+        const string returnRgx = @"(?<return>\w+(<\w+>)?)";
+
+        const string _classRegex = $@"{startRgx}\s+{typeRgx}\s+{nameRgx}";
+        const string _constructorRegex = $@"{startRgx}\s+{nameRgx}\s*\({paramRgx}\)";
+        const string _partialConstructorRegex = $@"{startRgx}\s+{nameRgx}\s*\({paramRgx}[^\)]";
+        const string _methodRegex = $@"{startRgx}\s+(static\s*)?(async\s*)?{returnRgx}\s+{nameRgx}\s*\({paramRgx}\)";
+        const string _partialMethodRegex = $@"{startRgx}\s+(static\s*)?(async\s*)?{returnRgx}\s+{nameRgx}\s*\({paramRgx}[^\)]";
+        const string _propertyRegex = $@"{startRgx}\s+{returnRgx}\s+{nameRgx}\s*{{\s*(?<getter>get;)?\s*(?<setter>set;)?(?<initer>init;)?\s*}}";
+        const string _parameterRegex = @"\s*(?<param>[^)]*)(?<end>\))?";
         const string _lineEnding = "\r\n";
 
         internal static bool IsXmlComment(string text)
@@ -39,15 +48,14 @@ namespace AutoCommentExtension
 
             if (classMatch.Success)
             {
-                var indentation = classMatch.Groups[1].Value;
+                var indentation = classMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var type = classMatch.Groups[2].Value;
-                var name = classMatch.Groups[3].Value;
-                var inheritances = classMatch.Groups[5].Value;
+                var access = classMatch.Groups["access"].Value;
+                var type = classMatch.Groups["type"].Value;
+                var name = classMatch.Groups["name"].Value;
 
                 sb.Append(indentation).Append(option.ClassTemplate).Append(_lineEnding);
-                sb.Replace("{type}", type).Replace("{name}", name).Replace("{inheritances}", inheritances)
-                    .Replace("{nl}", newLine);
+                sb.Replace("{type}", type).Replace("{name}", name).Replace("{nl}", newLine);
 
                 return (sb.ToString(), false, newLine);
             }
@@ -56,10 +64,11 @@ namespace AutoCommentExtension
 
             if (constructorMatch.Success)
             {
-                var indentation = constructorMatch.Groups[1].Value;
+                var indentation = constructorMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var name = constructorMatch.Groups[2].Value;
-                var parameters = constructorMatch.Groups[3].Value;
+                var access = classMatch.Groups["access"].Value;
+                var name = constructorMatch.Groups["name"].Value;
+                var parameters = constructorMatch.Groups["param"].Value;
                 var parametersComment = GetCommentForParameters(parameters, newLine, option);
 
                 sb.Append(indentation).Append(option.ConstructorTemplate).Append(_lineEnding);
@@ -73,10 +82,11 @@ namespace AutoCommentExtension
 
             if (partialConstructorMatch.Success)
             {
-                var indentation = partialConstructorMatch.Groups[1].Value;
+                var indentation = partialConstructorMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var name = partialConstructorMatch.Groups[2].Value;
-                var parameters = partialConstructorMatch.Groups[3].Value;
+                var access = classMatch.Groups["access"].Value;
+                var name = partialConstructorMatch.Groups["name"].Value;
+                var parameters = partialConstructorMatch.Groups["param"].Value;
                 var parametersComment = GetCommentForParameters(parameters, newLine, option);
                 var parametersPart = parametersComment ?? string.Empty;
                 parametersPart += "{additional parameters}";
@@ -92,19 +102,20 @@ namespace AutoCommentExtension
 
             if (methodMatch.Success)
             {
-                var indentation = methodMatch.Groups[1].Value;
+                var indentation = methodMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var type = methodMatch.Groups[4].Value;
-                var name = methodMatch.Groups[6].Value;
-                var parameters = methodMatch.Groups[7].Value;
+                var access = classMatch.Groups["access"].Value;
+                var returnType = methodMatch.Groups["return"].Value;
+                var name = methodMatch.Groups["name"].Value;
+                var parameters = methodMatch.Groups["param"].Value;
                 var parametersComment = GetCommentForParameters(parameters, newLine, option);
-                var returnsComment = GetCommentForReturnValue(type, newLine, option);
+                var returnsComment = GetCommentForReturnValue(returnType, newLine, option);
 
                 sb.Append(indentation).Append(option.MethodTemplate).Append(_lineEnding);
                 sb.Replace("{parameters}", parametersComment ?? string.Empty)
                     .Replace("{returns}", returnsComment ?? string.Empty)
-                    .Replace("{type}", type)
                     .Replace("{name}", name)
+                    .Replace("{type}", returnType)
                     .Replace("{nl}", newLine);
 
                 return (sb.ToString(), false, newLine);
@@ -114,21 +125,22 @@ namespace AutoCommentExtension
 
             if (partialMethodMatch.Success)
             {
-                var indentation = partialMethodMatch.Groups[1].Value;
+                var indentation = partialMethodMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var type = partialMethodMatch.Groups[4].Value;
-                var name = partialMethodMatch.Groups[6].Value;
-                var parameters = partialMethodMatch.Groups[7].Value;
+                var access = classMatch.Groups["access"].Value;
+                var returnType = partialMethodMatch.Groups["return"].Value;
+                var name = partialMethodMatch.Groups["name"].Value;
+                var parameters = partialMethodMatch.Groups["param"].Value;
                 var parametersComment = GetCommentForParameters(parameters, newLine, option);
-                var returnsComment = GetCommentForReturnValue(type, newLine, option);
+                var returnsComment = GetCommentForReturnValue(returnType, newLine, option);
                 var parametersPart = parametersComment ?? string.Empty;
                 parametersPart += "{additional parameters}";
 
                 sb.Append(indentation).Append(option.MethodTemplate).Append(_lineEnding);
                 sb.Replace("{parameters}", parametersPart)
                     .Replace("{returns}", returnsComment ?? string.Empty)
-                    .Replace("{type}", type)
                     .Replace("{name}", name)
+                    .Replace("{type}", returnType)
                     .Replace("{nl}", newLine);
 
                 return (sb.ToString(), true, newLine);
@@ -138,18 +150,19 @@ namespace AutoCommentExtension
 
             if (propertyMatch.Success)
             {
-                var indentation = propertyMatch.Groups[1].Value;
+                var indentation = propertyMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var type = propertyMatch.Groups[2].Value;
-                var name = propertyMatch.Groups[3].Value;
-                var hasGetter = propertyMatch.Groups[4].Success;
-                var hasSetter = propertyMatch.Groups[5].Success;
-                var hasIniter = propertyMatch.Groups[6].Success;
+                var access = classMatch.Groups["access"].Value;
+                var returnType = propertyMatch.Groups["return"].Value;
+                var name = propertyMatch.Groups["name"].Value;
+                var hasGetter = propertyMatch.Groups["getter"].Success;
+                var hasSetter = propertyMatch.Groups["setter"].Success;
+                var hasIniter = propertyMatch.Groups["initer"].Success;
 
                 var template = GetPropetyTemplate(hasGetter, hasSetter, hasIniter, option);
 
                 sb.Append(indentation).Append(template).Append(_lineEnding);
-                sb.Replace("{type}", type).Replace("{name}", name).Replace("{nl}", newLine);
+                sb.Replace("{type}", returnType).Replace("{name}", name).Replace("{nl}", newLine);
 
                 return (sb.ToString(), false, newLine);
             }
@@ -166,11 +179,11 @@ namespace AutoCommentExtension
 
             if (parameterMatch.Success)
             {
-                var parameters = parameterMatch.Groups[1].Value;
+                var parameters = parameterMatch.Groups["param"].Value;
                 var parametersComment = GetCommentForParameters(parameters, newLine, option);
                 sb.Append(parametersComment);
 
-                var lastLine = parameterMatch.Groups[2].Success;
+                var lastLine = parameterMatch.Groups["end"].Success;
 
                 return (sb.ToString(), !lastLine, newLine);
             }

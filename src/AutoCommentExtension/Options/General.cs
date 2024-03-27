@@ -26,9 +26,45 @@ namespace AutoCommentExtension
         [TypeConverter(typeof(EnumConverter))]
         public AutoCommentCommand RunOnSaveCommand { get; set; } = AutoCommentCommand.AutoCommentMissing;
 
+        [Category("General")]
+        [DisplayName("Create comment for public")]
+        [Description("If true, comments will be created for public members.")]
+        [DefaultValue(true)]
+        public bool CreateForPublic { get; set; } = true;
+
+        [Category("General")]
+        [DisplayName("Create comment for internal")]
+        [Description("If true, comments will be created for internal members.")]
+        [DefaultValue(true)]
+        public bool CreateForInternal { get; set; } = true;
+
+        [Category("General")]
+        [DisplayName("Create comment for protected")]
+        [Description("If true, comments will be created for protected members.")]
+        [DefaultValue(true)]
+        public bool CreateForProtected { get; set; } = true;
+
+        [Category("General")]
+        [DisplayName("Create comment for protected internal")]
+        [Description("If true, comments will be created for protected internal members.")]
+        [DefaultValue(true)]
+        public bool CreateForProtectedInternal { get; set; } = true;
+
+        [Category("General")]
+        [DisplayName("Create comment for private")]
+        [Description("If true, comments will be created for private members.")]
+        [DefaultValue(false)]
+        public bool CreateForPrivate { get; set; } = false;
+
+        [Category("General")]
+        [DisplayName("Create comment for private protected")]
+        [Description("If true, comments will be created for private protected members.")]
+        [DefaultValue(false)]
+        public bool CreateForPrivateProtected { get; set; } = false;
+
         [Category("Templates")]
         [DisplayName("Class/Struct/Interface/Enum")]
-        [Description("The template to use for a class, struct, interface, or enum. Possible values:\r\n - {name} : the name of the class/struct/interface\r\n - {type} : Class / Struct / Interface / Enum\r\n - {nl} : new line")]
+        [Description("The template to use for a class, struct, interface, or enum. Possible values:\r\n - {name} : the name of the class/struct/interface/enum\r\n - {type} : class/struct/interface/enum\r\n - {nl} : new line")]
         [DefaultValue(@"/// <summary>{nl}/// The {name} {type}.{nl}/// </summary>")]
         public string ClassTemplate { get; set; } = @"/// <summary>{nl}/// The {name} {type}.{nl}/// </summary>";
 
