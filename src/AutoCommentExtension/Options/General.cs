@@ -27,16 +27,10 @@ namespace AutoCommentExtension
         public AutoCommentCommand RunOnSaveCommand { get; set; } = AutoCommentCommand.AutoCommentMissing;
 
         [Category("Templates")]
-        [DisplayName("Class/Struct/Interface")]
-        [Description("The template to use for a class, struct, or interface. Possible values:\r\n - {name} : the name of the class/struct/interface\r\n - {type} : class, or interface\r\n - {inheritances} : base class and/or interfaces\r\n - {nl} : new line")]
+        [DisplayName("Class/Struct/Interface/Enum")]
+        [Description("The template to use for a class, struct, interface, or enum. Possible values:\r\n - {name} : the name of the class/struct/interface\r\n - {type} : Class / Struct / Interface / Enum\r\n - {nl} : new line")]
         [DefaultValue(@"/// <summary>{nl}/// The {name} {type}.{nl}/// </summary>")]
         public string ClassTemplate { get; set; } = @"/// <summary>{nl}/// The {name} {type}.{nl}/// </summary>";
-
-        [Category("Templates")]
-        [DisplayName("Enums")]
-        [Description("The template to use for enums. Possible values:\r\n - {name} : the name of the enum\r\n - {nl} : new line")]
-        [DefaultValue(@"/// <summary>{nl}/// The {name} enum.{nl}/// </summary>")]
-        public string EnumTemplate { get; set; } = @"/// <summary>{nl}/// The {name} enum.{nl}/// </summary>";
 
         [Category("Templates")]
         [DisplayName("Constructors")]

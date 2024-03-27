@@ -5,7 +5,6 @@
         bool RunOnSave { get; set; }
         AutoCommentCommand RunOnSaveCommand { get; set; }
         string ClassTemplate { get; set; }
-        string EnumTemplate { get; set; }
         string ConstructorTemplate { get; set; }
         string MethodTemplate { get; set; }
         string ParametersTemplate { get; set; }

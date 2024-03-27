@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using EnvDTE;
 
 namespace AutoCommentExtension
@@ -16,19 +17,19 @@ namespace AutoCommentExtension
             await CommentAsync();
         }
 
-        private void DocumentSaved(string x)
+        private void DocumentSaved(string path)
         {
             if (General.Instance.RunOnSave
-                && General.Instance.RunOnSaveCommand == AutoCommentCommand.AutoCommentMissing)
+                && General.Instance.RunOnSaveCommand == AutoCommentCommand.AutoCommentMissing
+                && path.EndsWith(".cs"))
             {
                 ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
                 {
                     try
                     {
                         await CommentAsync();
-                        var doc = await VS.Documents.GetActiveDocumentViewAsync();
-
-                        doc?.Document.Save();
+                        var document = await VS.Documents.GetActiveDocumentViewAsync();
+                        document?.Document.Save();
                     }
                     catch (Exception ex)
                     {
@@ -38,16 +39,16 @@ namespace AutoCommentExtension
             }
         }
 
-        private async Task CommentAsync()
+        private static async Task CommentAsync()
         {
-            var doc = await VS.Documents.GetActiveDocumentViewAsync();
+            var document = await VS.Documents.GetActiveDocumentViewAsync();
 
-            if (doc == null)
+            if (document == null)
             {
                 return;
             }
 
-            var contentType = doc.TextBuffer.ContentType;
+            var contentType = document.TextBuffer.ContentType;
 
             if (contentType.TypeName != ContentTypes.CSharp)
             {
@@ -61,15 +62,24 @@ namespace AutoCommentExtension
                 return;
             }
 
-            var lines = doc.TextBuffer.CurrentSnapshot.Lines;
+            await EditDocumentWithOptionsAsync(document, options);
+        }
 
-            using var edit = doc.TextBuffer.CreateEdit();
+        public static async Task EditDocumentWithOptionsAsync(DocumentView document, General options)
+        {
+            var lines = document.TextBuffer.CurrentSnapshot.Lines;
+
+            using var edit = document.TextBuffer.CreateEdit();
 
             var lineIndex = 1;
             var lineCount = lines.Count();
             var prevLineWasComment = false;
             var prevLineWasAttribute = false;
             var firstAttributeLine = lines.FirstOrDefault();
+            var prevLineWasPartialResult = false;
+            var partialResults = new List<string>();
+            var firstPartialResultLine = lines.FirstOrDefault();
+            var newLine = string.Empty;
 
             foreach (var line in lines)
             {
@@ -78,6 +88,8 @@ namespace AutoCommentExtension
                 if (XmlComment.IsXmlComment(text))
                 {
                     prevLineWasComment = true;
+                    prevLineWasAttribute = false;
+                    prevLineWasPartialResult = false;
                 }
                 else if (XmlComment.IsAttribute(text))
                 {
@@ -87,32 +99,79 @@ namespace AutoCommentExtension
                     }
 
                     prevLineWasAttribute = true;
+                    prevLineWasPartialResult = false;
                 }
                 else
                 {
                     if (!prevLineWasComment)
                     {
-                        var comment = XmlComment.GetComment(text, options);
+                        (string Text, bool IsPartial, string NewLine) comment = default;
 
-                        if (comment != null)
+                        if (!prevLineWasPartialResult)
                         {
-                            if (!prevLineWasAttribute)
+                            comment = XmlComment.GetComment(text, options);
+                        }
+                        else
+                        {
+                            comment = XmlComment.GetPartialComment(text, options, newLine);
+                        }
+
+                        if (comment.Text != null)
+                        {
+                            if (!comment.IsPartial)
                             {
-                                edit.Insert(line.Start, comment);
+                                var finalText = string.Empty;
+                                var insertLine = line;
+
+                                if (prevLineWasPartialResult)
+                                {
+                                    partialResults.Add(comment.Text);
+                                    finalText = partialResults[0];
+                                    var additionalParameters = string.Join(string.Empty, partialResults.Skip(1));
+                                    finalText = finalText.Replace("{additional parameters}", additionalParameters);
+                                    insertLine = firstPartialResultLine;
+                                }
+                                else
+                                {
+                                    finalText = comment.Text;
+                                }
+
+                                if (prevLineWasAttribute)
+                                {
+                                    insertLine = firstAttributeLine;
+                                }
+
+                                edit.Insert(insertLine.Start, finalText);
+
+                                prevLineWasAttribute = false;
+                                prevLineWasPartialResult = false;
                             }
                             else
                             {
-                                edit.Insert(firstAttributeLine.Start, comment);
+                                if (!prevLineWasPartialResult)
+                                {
+                                    firstPartialResultLine = line;
+                                    partialResults = new();
+                                }
+
+                                prevLineWasPartialResult = true;
+                                partialResults.Add(comment.Text);
+                                newLine = comment.NewLine;
                             }
                         }
                     }
+                    else
+                    {
+                        prevLineWasAttribute = false;
+                        prevLineWasPartialResult = false;
+                    }
 
                     prevLineWasComment = false;
-                    prevLineWasAttribute = false;
                 }
+
+                await VS.StatusBar.ShowProgressAsync($"Generating.. {lineIndex}/{lineCount}", lineIndex++, lineCount);
             }
 
-            await VS.StatusBar.ShowProgressAsync($"Step {lineIndex}/{lineCount}", lineIndex++, lineCount);
             edit.Apply();
         }
     }

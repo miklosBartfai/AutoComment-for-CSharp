@@ -8,7 +8,6 @@ namespace AutoCommentExtension
     {
         public AddAllCommand()
         {
-
             VS.Events.DocumentEvents.Saved += DocumentSaved;
         }
 
@@ -17,10 +16,11 @@ namespace AutoCommentExtension
             await CommentAsync();
         }
 
-        private void DocumentSaved(string x)
+        private void DocumentSaved(string path)
         {
             if (General.Instance.RunOnSave
-                && General.Instance.RunOnSaveCommand == AutoCommentCommand.AutoCommentAll)
+                && General.Instance.RunOnSaveCommand == AutoCommentCommand.AutoCommentAll
+                && path.EndsWith(".cs"))
             {
                 ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
                 {
@@ -40,14 +40,14 @@ namespace AutoCommentExtension
 
         private async Task CommentAsync()
         {
-            var doc = await VS.Documents.GetActiveDocumentViewAsync();
+            var document = await VS.Documents.GetActiveDocumentViewAsync();
 
-            if (doc == null)
+            if (document == null)
             {
                 return;
             }
 
-            var contentType = doc.TextBuffer.ContentType;
+            var contentType = document.TextBuffer.ContentType;
 
             if (contentType.TypeName != ContentTypes.CSharp)
             {
@@ -61,14 +61,18 @@ namespace AutoCommentExtension
                 return;
             }
 
-            var lines = doc.TextBuffer.CurrentSnapshot.Lines;
+            await CleanCommentsAsync(document);
+            await AddMissingCommand.EditDocumentWithOptionsAsync(document, options);
+        }
 
-            using var edit = doc.TextBuffer.CreateEdit();
+        private static async Task CleanCommentsAsync(DocumentView document)
+        {
+            var lines = document.TextBuffer.CurrentSnapshot.Lines;
+
+            using var edit = document.TextBuffer.CreateEdit();
 
             var lineIndex = 1;
             var lineCount = lines.Count();
-            var prevLineWasAttribute = false;
-            var firstAttributeLine = lines.FirstOrDefault();
 
             foreach (var line in lines)
             {
@@ -79,35 +83,8 @@ namespace AutoCommentExtension
                     var extent = Span.FromBounds(line.Start, line.EndIncludingLineBreak);
                     edit.Delete(extent);
                 }
-                else if (XmlComment.IsAttribute(text))
-                {
-                    if (!prevLineWasAttribute)
-                    {
-                        firstAttributeLine = line;
-                    }
 
-                    prevLineWasAttribute = true;
-                }
-                else
-                {
-                    var comment = XmlComment.GetComment(text, options);
-
-                    if (comment != null)
-                    {
-                        if (!prevLineWasAttribute)
-                        {
-                            edit.Insert(line.Start, comment);
-                        }
-                        else
-                        {
-                            edit.Insert(firstAttributeLine.Start, comment);
-                        }
-                    }
-
-                    prevLineWasAttribute = false;
-                }
-
-                await VS.StatusBar.ShowProgressAsync($"Step {lineIndex}/{lineCount}", lineIndex++, lineCount);
+                await VS.StatusBar.ShowProgressAsync($"Cleaning.. {lineIndex}/{lineCount}", lineIndex++, lineCount);
             }
 
             edit.Apply();

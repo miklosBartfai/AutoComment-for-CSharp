@@ -5,13 +5,15 @@ namespace AutoCommentExtension
 {
     internal static class XmlComment
     {
-        const string _xmlCommentRegex = @"[\t\f\v ]*///";
+        const string _xmlCommentRegex = @"\s*///";
         const string _attributeRegex = @"\s+\[";
-        const string _classRegex = @"([\t\f\v ]*)public\s+(class|interface|struct)\s+(\w+)\s*(:?\s*(\w+(,\s*\w+)*)?)?";
-        const string _enumRegex = @"([\t\f\v ]*)public\s+enum\s+(\w+)";
-        const string _constructorRegex = @"([\t\f\v ]*)public\s+(\w+)\s*\(([^)]*)\)\s*{?";
-        const string _propertyRegex = @"([\t\f\v ]*)public\s+(\w+)\s+(\w+)\s*{\s*(get;)?\s*(set;)?(init;)?\s*}";
-        const string _methodRegex = @"([\t\f\v ]*)public\s+(static\s*)?(async\s*)?(\w+(<\w+>)?)\s+(\w+)\s*\(([^)]*)\)";
+        const string _classRegex = @"(\s*)public\s+(class|interface|struct|enum)\s+(\w+)";
+        const string _constructorRegex = @"(\s*)public\s+(\w+)\s*\(([^)]*)\)";
+        const string _partialConstructorRegex = @"(\s*)public\s+(\w+)\s*\(([^)]*)[^\)]";
+        const string _methodRegex = @"(\s*)public\s+(static\s*)?(async\s*)?(\w+(<\w+>)?)\s+(\w+)\s*\(([^)]*)\)";
+        const string _partialMethodRegex = @"(\s*)public\s+(static\s*)?(async\s*)?(\w+(<\w+>)?)\s+(\w+)\s*\(([^)]*)[^\)]";
+        const string _propertyRegex = @"(\s*)public\s+(\w+)\s+(\w+)\s*{\s*(get;)?\s*(set;)?(init;)?\s*}";
+        const string _parameterRegex = @"\s*([^)]*)(\))?";
         const string _lineEnding = "\r\n";
 
         internal static bool IsXmlComment(string text)
@@ -28,7 +30,8 @@ namespace AutoCommentExtension
             return match.Success || firstCharIsAMatch;
         }
 
-        internal static string GetComment(string text, IXmlCommentOption option)
+        internal static (string Text, bool IsPartial, string NewLine) GetComment(
+            string text, IXmlCommentOption option)
         {
             var sb = new StringBuilder();
 
@@ -46,21 +49,7 @@ namespace AutoCommentExtension
                 sb.Replace("{type}", type).Replace("{name}", name).Replace("{inheritances}", inheritances)
                     .Replace("{nl}", newLine);
 
-                return sb.ToString();
-            }
-
-            var enumMatch = Regex.Match(text, _enumRegex);
-
-            if (enumMatch.Success)
-            {
-                var indentation = enumMatch.Groups[1].Value;
-                var newLine = _lineEnding + indentation;
-                var name = enumMatch.Groups[2].Value;
-
-                sb.Append(indentation).Append(option.EnumTemplate).Append(_lineEnding);
-                sb.Replace("{name}", name).Replace("{nl}", newLine);
-
-                return sb.ToString();
+                return (sb.ToString(), false, newLine);
             }
 
             var constructorMatch = Regex.Match(text, _constructorRegex);
@@ -77,27 +66,26 @@ namespace AutoCommentExtension
                 sb.Replace("{name}", name).Replace("{parameters}", parametersComment ?? string.Empty)
                     .Replace("{nl}", newLine);
 
-                return sb.ToString();
+                return (sb.ToString(), false, newLine);
             }
 
-            var propertyMatch = Regex.Match(text, _propertyRegex);
+            var partialConstructorMatch = Regex.Match(text, _partialConstructorRegex);
 
-            if (propertyMatch.Success)
+            if (partialConstructorMatch.Success)
             {
-                var indentation = propertyMatch.Groups[1].Value;
+                var indentation = partialConstructorMatch.Groups[1].Value;
                 var newLine = _lineEnding + indentation;
-                var type = propertyMatch.Groups[2].Value;
-                var name = propertyMatch.Groups[3].Value;
-                var hasGetter = propertyMatch.Groups[4].Success;
-                var hasSetter = propertyMatch.Groups[5].Success;
-                var hasIniter = propertyMatch.Groups[6].Success;
+                var name = partialConstructorMatch.Groups[2].Value;
+                var parameters = partialConstructorMatch.Groups[3].Value;
+                var parametersComment = GetCommentForParameters(parameters, newLine, option);
+                var parametersPart = parametersComment ?? string.Empty;
+                parametersPart += "{additional parameters}";
 
-                var template = GetPropetyTemplate(hasGetter, hasSetter, hasIniter, option);
+                sb.Append(indentation).Append(option.ConstructorTemplate).Append(_lineEnding);
+                sb.Replace("{name}", name).Replace("{parameters}", parametersPart)
+                    .Replace("{nl}", newLine);
 
-                sb.Append(indentation).Append(template).Append(_lineEnding);
-                sb.Replace("{type}", type).Replace("{name}", name).Replace("{nl}", newLine);
-
-                return sb.ToString();
+                return (sb.ToString(), true, newLine);
             }
 
             var methodMatch = Regex.Match(text, _methodRegex);
@@ -119,10 +107,75 @@ namespace AutoCommentExtension
                     .Replace("{name}", name)
                     .Replace("{nl}", newLine);
 
-                return sb.ToString();
+                return (sb.ToString(), false, newLine);
             }
 
-            return null;
+            var partialMethodMatch = Regex.Match(text, _partialMethodRegex);
+
+            if (partialMethodMatch.Success)
+            {
+                var indentation = partialMethodMatch.Groups[1].Value;
+                var newLine = _lineEnding + indentation;
+                var type = partialMethodMatch.Groups[4].Value;
+                var name = partialMethodMatch.Groups[6].Value;
+                var parameters = partialMethodMatch.Groups[7].Value;
+                var parametersComment = GetCommentForParameters(parameters, newLine, option);
+                var returnsComment = GetCommentForReturnValue(type, newLine, option);
+                var parametersPart = parametersComment ?? string.Empty;
+                parametersPart += "{additional parameters}";
+
+                sb.Append(indentation).Append(option.MethodTemplate).Append(_lineEnding);
+                sb.Replace("{parameters}", parametersPart)
+                    .Replace("{returns}", returnsComment ?? string.Empty)
+                    .Replace("{type}", type)
+                    .Replace("{name}", name)
+                    .Replace("{nl}", newLine);
+
+                return (sb.ToString(), true, newLine);
+            }
+
+            var propertyMatch = Regex.Match(text, _propertyRegex);
+
+            if (propertyMatch.Success)
+            {
+                var indentation = propertyMatch.Groups[1].Value;
+                var newLine = _lineEnding + indentation;
+                var type = propertyMatch.Groups[2].Value;
+                var name = propertyMatch.Groups[3].Value;
+                var hasGetter = propertyMatch.Groups[4].Success;
+                var hasSetter = propertyMatch.Groups[5].Success;
+                var hasIniter = propertyMatch.Groups[6].Success;
+
+                var template = GetPropetyTemplate(hasGetter, hasSetter, hasIniter, option);
+
+                sb.Append(indentation).Append(template).Append(_lineEnding);
+                sb.Replace("{type}", type).Replace("{name}", name).Replace("{nl}", newLine);
+
+                return (sb.ToString(), false, newLine);
+            }
+
+            return (null, false, string.Empty);
+        }
+
+        internal static (string Text, bool IsPartial, string newLine) GetPartialComment(
+            string text, IXmlCommentOption option, string newLine)
+        {
+            var sb = new StringBuilder();
+
+            var parameterMatch = Regex.Match(text, _parameterRegex);
+
+            if (parameterMatch.Success)
+            {
+                var parameters = parameterMatch.Groups[1].Value;
+                var parametersComment = GetCommentForParameters(parameters, newLine, option);
+                sb.Append(parametersComment);
+
+                var lastLine = parameterMatch.Groups[2].Success;
+
+                return (sb.ToString(), !lastLine, newLine);
+            }
+
+            return (null, false, string.Empty);
         }
 
         private static string GetCommentForParameters(string text, string newLine, IXmlCommentOption option)
@@ -136,7 +189,7 @@ namespace AutoCommentExtension
 
                 if (typeName.Length != 2)
                 {
-                    return null;
+                    continue;
                 }
 
                 var type = typeName[0];
