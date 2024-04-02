@@ -4,6 +4,12 @@
     {
         bool RunOnSave { get; set; }
         AutoCommentCommand RunOnSaveCommand { get; set; }
+        bool CreateForPublic { get; set; }
+        bool CreateForInternal { get; set; }
+        bool CreateForProtected { get; set; }
+        bool CreateForProtectedInternal { get; set; }
+        bool CreateForPrivate { get; set; }
+        bool CreateForPrivateProtected { get; set; }
         string ClassTemplate { get; set; }
         string ConstructorTemplate { get; set; }
         string MethodTemplate { get; set; }

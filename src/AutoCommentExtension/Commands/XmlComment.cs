@@ -14,7 +14,7 @@ namespace AutoCommentExtension
         const string typeRgx = @"(?<type>class|interface|struct|enum)";
         const string nameRgx = @"(?<name>\w+)";
         const string paramRgx = @"(?<param>[^)]*)";
-        const string returnRgx = @"(?<return>\w+(<\w+>)?)";
+        const string returnRgx = @"(?<baseType>\w+)(?<genericType><\w+>)?";
 
         const string _classRegex = $@"{startRgx}\s+{typeRgx}\s+{nameRgx}";
         const string _constructorRegex = $@"{startRgx}\s+{nameRgx}\s*\({paramRgx}\)";
@@ -48,14 +48,23 @@ namespace AutoCommentExtension
 
             if (classMatch.Success)
             {
+                var access = classMatch.Groups["access"].Value;
+
+                if (accessModifierIsNotEnabledFor(access, option))
+                {
+                    return (null, false, string.Empty);
+                }
+
                 var indentation = classMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var access = classMatch.Groups["access"].Value;
                 var type = classMatch.Groups["type"].Value;
                 var name = classMatch.Groups["name"].Value;
 
                 sb.Append(indentation).Append(option.ClassTemplate).Append(_lineEnding);
-                sb.Replace("{type}", type).Replace("{name}", name).Replace("{nl}", newLine);
+                sb.Replace("{type}", type)
+                    .Replace("{name}", name)
+                    .Replace("{access}", access)
+                    .Replace("{nl}", newLine);
 
                 return (sb.ToString(), false, newLine);
             }
@@ -64,15 +73,23 @@ namespace AutoCommentExtension
 
             if (constructorMatch.Success)
             {
+                var access = constructorMatch.Groups["access"].Value;
+
+                if (accessModifierIsNotEnabledFor(access, option))
+                {
+                    return (null, false, string.Empty);
+                }
+
                 var indentation = constructorMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var access = classMatch.Groups["access"].Value;
                 var name = constructorMatch.Groups["name"].Value;
                 var parameters = constructorMatch.Groups["param"].Value;
                 var parametersComment = GetCommentForParameters(parameters, newLine, option);
 
                 sb.Append(indentation).Append(option.ConstructorTemplate).Append(_lineEnding);
-                sb.Replace("{name}", name).Replace("{parameters}", parametersComment ?? string.Empty)
+                sb.Replace("{name}", name)
+                    .Replace("{access}", access)
+                    .Replace("{parameters}", parametersComment ?? string.Empty)
                     .Replace("{nl}", newLine);
 
                 return (sb.ToString(), false, newLine);
@@ -82,9 +99,15 @@ namespace AutoCommentExtension
 
             if (partialConstructorMatch.Success)
             {
+                var access = partialConstructorMatch.Groups["access"].Value;
+
+                if (accessModifierIsNotEnabledFor(access, option))
+                {
+                    return (null, false, string.Empty);
+                }
+
                 var indentation = partialConstructorMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var access = classMatch.Groups["access"].Value;
                 var name = partialConstructorMatch.Groups["name"].Value;
                 var parameters = partialConstructorMatch.Groups["param"].Value;
                 var parametersComment = GetCommentForParameters(parameters, newLine, option);
@@ -92,7 +115,9 @@ namespace AutoCommentExtension
                 parametersPart += "{additional parameters}";
 
                 sb.Append(indentation).Append(option.ConstructorTemplate).Append(_lineEnding);
-                sb.Replace("{name}", name).Replace("{parameters}", parametersPart)
+                sb.Replace("{name}", name)
+                    .Replace("{access}", access)
+                    .Replace("{parameters}", parametersPart)
                     .Replace("{nl}", newLine);
 
                 return (sb.ToString(), true, newLine);
@@ -102,20 +127,32 @@ namespace AutoCommentExtension
 
             if (methodMatch.Success)
             {
+                var access = methodMatch.Groups["access"].Value;
+
+                if (accessModifierIsNotEnabledFor(access, option))
+                {
+                    return (null, false, string.Empty);
+                }
+
                 var indentation = methodMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var access = classMatch.Groups["access"].Value;
-                var returnType = methodMatch.Groups["return"].Value;
+                var baseType = methodMatch.Groups["baseType"].Value;
+                var generic = methodMatch.Groups["genericType"].Value;
+                var genericType = generic.TrimStart('<').TrimEnd('>');
+                var fullType = baseType + generic;
                 var name = methodMatch.Groups["name"].Value;
                 var parameters = methodMatch.Groups["param"].Value;
                 var parametersComment = GetCommentForParameters(parameters, newLine, option);
-                var returnsComment = GetCommentForReturnValue(returnType, newLine, option);
+                var returnsComment = GetCommentForReturnValue(baseType, newLine, option);
 
                 sb.Append(indentation).Append(option.MethodTemplate).Append(_lineEnding);
                 sb.Replace("{parameters}", parametersComment ?? string.Empty)
                     .Replace("{returns}", returnsComment ?? string.Empty)
                     .Replace("{name}", name)
-                    .Replace("{type}", returnType)
+                    .Replace("{access}", access)
+                    .Replace("{baseType}", baseType)
+                    .Replace("{genericType}", genericType)
+                    .Replace("{fullType}", fullType)
                     .Replace("{nl}", newLine);
 
                 return (sb.ToString(), false, newLine);
@@ -125,14 +162,23 @@ namespace AutoCommentExtension
 
             if (partialMethodMatch.Success)
             {
+                var access = partialMethodMatch.Groups["access"].Value;
+
+                if (accessModifierIsNotEnabledFor(access, option))
+                {
+                    return (null, false, string.Empty);
+                }
+
                 var indentation = partialMethodMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var access = classMatch.Groups["access"].Value;
-                var returnType = partialMethodMatch.Groups["return"].Value;
+                var baseType = partialMethodMatch.Groups["baseType"].Value;
+                var generic = partialMethodMatch.Groups["genericType"].Value;
+                var genericType = generic.TrimStart('<').TrimEnd('>');
+                var fullType = baseType + generic;
                 var name = partialMethodMatch.Groups["name"].Value;
                 var parameters = partialMethodMatch.Groups["param"].Value;
                 var parametersComment = GetCommentForParameters(parameters, newLine, option);
-                var returnsComment = GetCommentForReturnValue(returnType, newLine, option);
+                var returnsComment = GetCommentForReturnValue(baseType, newLine, option);
                 var parametersPart = parametersComment ?? string.Empty;
                 parametersPart += "{additional parameters}";
 
@@ -140,7 +186,10 @@ namespace AutoCommentExtension
                 sb.Replace("{parameters}", parametersPart)
                     .Replace("{returns}", returnsComment ?? string.Empty)
                     .Replace("{name}", name)
-                    .Replace("{type}", returnType)
+                    .Replace("{access}", access)
+                    .Replace("{baseType}", baseType)
+                    .Replace("{genericType}", genericType)
+                    .Replace("{fullType}", fullType)
                     .Replace("{nl}", newLine);
 
                 return (sb.ToString(), true, newLine);
@@ -150,10 +199,19 @@ namespace AutoCommentExtension
 
             if (propertyMatch.Success)
             {
+                var access = propertyMatch.Groups["access"].Value;
+
+                if (accessModifierIsNotEnabledFor(access, option))
+                {
+                    return (null, false, string.Empty);
+                }
+
                 var indentation = propertyMatch.Groups["indent"].Value;
                 var newLine = _lineEnding + indentation;
-                var access = classMatch.Groups["access"].Value;
-                var returnType = propertyMatch.Groups["return"].Value;
+                var baseType = propertyMatch.Groups["baseType"].Value;
+                var generic = propertyMatch.Groups["genericType"].Value;
+                var genericType = generic.TrimStart('<').TrimEnd('>');
+                var fullType = baseType + generic;
                 var name = propertyMatch.Groups["name"].Value;
                 var hasGetter = propertyMatch.Groups["getter"].Success;
                 var hasSetter = propertyMatch.Groups["setter"].Success;
@@ -162,7 +220,12 @@ namespace AutoCommentExtension
                 var template = GetPropetyTemplate(hasGetter, hasSetter, hasIniter, option);
 
                 sb.Append(indentation).Append(template).Append(_lineEnding);
-                sb.Replace("{type}", returnType).Replace("{name}", name).Replace("{nl}", newLine);
+                sb.Replace("{name}", name)
+                    .Replace("{access}", access)
+                    .Replace("{baseType}", baseType)
+                    .Replace("{genericType}", genericType)
+                    .Replace("{fullType}", fullType)
+                    .Replace("{nl}", newLine);
 
                 return (sb.ToString(), false, newLine);
             }
@@ -226,6 +289,20 @@ namespace AutoCommentExtension
 
             var template = option.ReturnsTemplate;
             return newLine + template;
+        }
+
+        private static bool accessModifierIsNotEnabledFor(string access, IXmlCommentOption option)
+        {
+            return access switch
+            {
+                "public" => !option.CreateForPublic,
+                "internal" => !option.CreateForInternal,
+                "protected" => !option.CreateForProtected,
+                "protected internal" => !option.CreateForProtectedInternal,
+                "private" => !option.CreateForPrivate,
+                "private protected" => !option.CreateForPrivateProtected,
+                _ => false
+            };
         }
 
         private static string GetPropetyTemplate(bool hasGetter, bool hasSetter, bool hasIniter, IXmlCommentOption option)
