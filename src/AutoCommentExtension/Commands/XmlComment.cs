@@ -14,7 +14,7 @@ namespace AutoCommentExtension
         const string typeRgx = @"(?<type>class|interface|struct|enum)";
         const string nameRgx = @"(?<name>\w+)";
         const string paramRgx = @"(?<param>[^)]*)";
-        const string returnRgx = @"(?<baseType>\w+)(?<genericType><\w+>)?";
+        const string returnRgx = @"(?<baseType>\w+(\?)?)(?<genericType><\w+(\?)?>)?";
 
         const string _classRegex = $@"{startRgx}\s+{typeRgx}\s+{nameRgx}";
         const string _constructorRegex = $@"{startRgx}\s+{nameRgx}\s*\({paramRgx}\)";
