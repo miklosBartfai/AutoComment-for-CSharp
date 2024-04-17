@@ -14,13 +14,13 @@ namespace AutoCommentExtension
         const string typeRgx = @"(?<type>class|interface|struct|enum)";
         const string nameRgx = @"(?<name>\w+)";
         const string paramRgx = @"(?<param>[^)]*)";
-        const string returnRgx = @"(?<baseType>\w+(\?)?)(?<genericType><\w+(\?)?>)?";
+        const string returnRgx = @"(?<baseType>\w+(\?)?)(?<genericType><\w+(\?)?(<\w+>(\?)?)?>)?";
 
-        const string _classRegex = $@"{startRgx}\s+{typeRgx}\s+{nameRgx}";
+        const string _classRegex = $@"{startRgx}\s+(static\s*)?{typeRgx}\s+{nameRgx}";
         const string _constructorRegex = $@"{startRgx}\s+{nameRgx}\s*\({paramRgx}\)";
-        const string _partialConstructorRegex = $@"{startRgx}\s+{nameRgx}\s*\({paramRgx}[^\)]";
-        const string _methodRegex = $@"{startRgx}\s+(static\s*)?(async\s*)?{returnRgx}\s+{nameRgx}\s*\({paramRgx}\)";
-        const string _partialMethodRegex = $@"{startRgx}\s+(static\s*)?(async\s*)?{returnRgx}\s+{nameRgx}\s*\({paramRgx}[^\)]";
+        const string _partialConstructorRegex = $@"{startRgx}\s+{nameRgx}\s*\({paramRgx}";
+        const string _methodRegex = $@"{startRgx}\s+(static\s*)?(async\s*)?{returnRgx}\s+{nameRgx}(<\w+(,\s*\w+)?>)?\s*\({paramRgx}\)";
+        const string _partialMethodRegex = $@"{startRgx}\s+(static\s*)?(async\s*)?{returnRgx}\s+{nameRgx}(<\w+(,\s*\w+)?>)?\s*\({paramRgx}";
         const string _propertyRegex = $@"{startRgx}\s+{returnRgx}\s+{nameRgx}\s*{{\s*(?<getter>get;)?\s*(?<setter>set;)?(?<initer>init;)?\s*}}";
         const string _parameterRegex = @"\s*(?<param>[^)]*)(?<end>\))?";
         const string _lineEnding = "\r\n";
@@ -263,13 +263,17 @@ namespace AutoCommentExtension
             {
                 var typeName = parameter.Trim().Split(' ');
 
-                if (typeName.Length != 2)
+                if (typeName.Length < 2)
                 {
                     continue;
                 }
 
-                var type = typeName[0];
-                var name = typeName[1];
+                var (type, name) = typeName.Length switch
+                {
+                    2 => (typeName[0], typeName[1]),
+                    3 => (typeName[1], typeName[2]),
+                    _ => ("-error-", "-error-")
+                };
 
                 var parameterLine = newLine + option.ParametersTemplate;
                 parameterLine = parameterLine.Replace("{type}", type).Replace("{name}", name).Replace("{nl}", newLine);
